@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
+import base64
 import pymysql
 from pymysql.cursors import DictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -38,6 +39,9 @@ def get_db():
     return conn
 
 
+def b64decode_unicode(s):
+    data = base64.b64decode(s).decode('latin1')
+    return bytes(data, 'latin1').decode('utf-8', errors='ignore')
 def init_db():
     """Initialize MySQL database (create tables and admin user if not exist)"""
     conn = get_db()
@@ -122,35 +126,64 @@ def set_language(lang):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+    try:
+        if request.method == 'POST':
+            email = b64decode_unicode(request.form['email'])
+            password = b64decode_unicode(request.form['password'])
 
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute('SELECT * FROM users WHERE email = %s', (email,))
-        user = cur.fetchone()
-        cur.close()
-        conn.close()
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
 
-        if user is None:
-            flash("You do not have an account.", "error")
-        elif check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['role'] = user['role']
-            session['fullname'] = user['fullname']
+            if user is None:
+                flash("You do not have an account.", "error")
+            elif check_password_hash(user['password'], password):
+                session['user_id'] = user['id']
+                session['role'] = user['role']
+                session['fullname'] = user['fullname']
 
-            if user['role'] == 'admin':
-                return redirect(url_for('admin_dashboard'))
+                if user['role'] == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                else:
+                    return redirect(url_for('user_dashboard'))
             else:
-                return redirect(url_for('user_dashboard'))
-        else:
-            flash("Invalid password", "error")
+                flash("Invalid password", "error")
 
-    lang = session.get('lang', 'en')
-    return render_template('login_tl.html' if lang == 'tl' else 'login.html')
+        lang = session.get('lang', 'en')
+        return render_template('login_tl.html' if lang == 'tl' else 'login.html')
+    
+    except Exception:
+        if request.method == 'POST':
+            email = request.form['email']
+            password = request.form['password'] 
 
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+            user = cur.fetchone()
+            cur.close()
+            conn.close()
 
+            if user is None:
+                    flash("You do not have an account.", "error")
+            elif check_password_hash(user['password'], password):
+                    session['user_id'] = user['id']
+                    session['role'] = user['role']
+                    session['fullname'] = user['fullname']
+
+                    if user['role'] == 'admin':
+                        return redirect(url_for('admin_dashboard'))
+                    else:
+                        return redirect(url_for('user_dashboard'))
+            else:
+                flash("Invalid password", "error")
+
+            lang = session.get('lang', 'en')
+            return render_template('login_tl.html' if lang == 'tl' else 'login.html')
+    
 @app.route('/register', methods=['GET', 'POST'])
 def register_page():
     if request.method == 'POST':
@@ -289,9 +322,9 @@ def user_dashboard():
         if not (doc_type and full_name and address_form and contact and purpose):
             flash("All fields are required.", "error")
         else:
-            cur.execute('''INSERT INTO requests (user_id, full_name, email, document_type, address, contact, purpose, status)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
-                        (user_id, full_name, session['email'], doc_type, address_form, contact, purpose, 'Pending'))
+            cur.execute('''INSERT INTO requests (user_id, document_type, full_name, address, contact, purpose, status)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+                        (user_id, doc_type, full_name, address_form, contact, purpose, 'Pending'))
             conn.commit()
             flash("Request submitted successfully!", "success")
 
