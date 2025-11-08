@@ -289,9 +289,9 @@ def user_dashboard():
         if not (doc_type and full_name and address_form and contact and purpose):
             flash("All fields are required.", "error")
         else:
-            cur.execute('''INSERT INTO requests (user_id, document_type, full_name, address, contact, purpose, status)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s)''',
-                        (user_id, doc_type, full_name, address_form, contact, purpose, 'Pending'))
+            cur.execute('''INSERT INTO requests (user_id, full_name, email, document_type, address, contact, purpose, status)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
+                        (user_id, full_name, session['email'], doc_type, address_form, contact, purpose, 'Pending'))
             conn.commit()
             flash("Request submitted successfully!", "success")
 
